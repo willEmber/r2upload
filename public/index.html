@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>R2 Upload</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body>
+  <header class="topbar container">
+    <div class="brand">
+      <span class="logo">R2</span>
+      <h1>Upload Console</h1>
+    </div>
+    <div class="toolbar">
+      <button id="btnSettings" class="btn">Settings</button>
+      <div id="healthStatus" class="health-status">
+        <span class="health-icon">⚡</span>
+        <span class="health-text">Checking...</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container grid">
+    <section class="card">
+      <h2>Upload</h2>
+      <div id="dropZone" class="drop">
+        <p>Drag & drop files here</p>
+        <button id="btnChoose" class="btn">Choose Files</button>
+        <input id="file" type="file" multiple aria-label="Choose files" style="display:none" />
+      </div>
+      <div id="previewGrid" class="preview-grid"></div>
+      <div class="form-row">
+        <label for="prefix">Prefix</label>
+        <input id="prefix" type="text" placeholder="e.g. avatars/user123 (optional)" />
+      </div>
+      <div class="form-row">
+        <label for="strategy">Strategy</label>
+        <select id="strategy">
+          <option value="hash" selected>hash (recommended)</option>
+          <option value="original">original filename</option>
+        </select>
+      </div>
+      <div class="actions">
+        <button id="btnUploadAll" class="btn primary">Upload Selected</button>
+        <button id="btnClear" class="btn" title="Clear queue">Clear</button>
+        <progress id="overallProgress" value="0" max="100"></progress>
+      </div>
+      <div id="uploadResult" class="result"></div>
+    </section>
+
+    <section class="card">
+      <h2>Objects</h2>
+      <div class="form-row">
+        <input id="listPrefix" type="text" placeholder="Filter by prefix (optional)" />
+        <button id="btnList" class="btn">List</button>
+      </div>
+      <div class="batch-actions">
+        <button id="btnDeleteSelected" class="btn danger" disabled>Delete Selected</button>
+      </div>
+      <div id="listResult" class="table-wrap"></div>
+      <div class="pager">
+        <button id="btnPrev" class="btn" disabled>Prev</button>
+        <span id="pageInfo" class="muted"></span>
+        <button id="btnNext" class="btn" disabled>Next</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="settings">
+      <h3>Settings</h3>
+      <div class="form-row">
+        <label for="cfgApiBase">API Base URL</label>
+        <input id="cfgApiBase" type="text" placeholder="default: same origin (empty)" />
+      </div>
+      <div class="form-row">
+        <label for="cfgPublicBase">Public Base URL (optional)</label>
+        <input id="cfgPublicBase" type="text" placeholder="https://img.example.com" />
+      </div>
+      <div class="form-row">
+        <label for="cfgDefaultPrefix">Default Prefix</label>
+        <input id="cfgDefaultPrefix" type="text" placeholder="e.g. dev/ or uploads/" />
+      </div>
+      <div class="form-row">
+        <label for="cfgDefaultStrategy">Default Strategy</label>
+        <select id="cfgDefaultStrategy">
+          <option value="hash">hash</option>
+          <option value="original">original</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="cfgTheme">Theme</label>
+        <select id="cfgTheme">
+          <option value="system">system</option>
+          <option value="light">light</option>
+          <option value="dark">dark</option>
+        </select>
+      </div>
+      <div class="actions">
+        <button value="cancel" class="btn">Cancel</button>
+        <button id="btnSaveSettings" value="default" class="btn primary">Save</button>
+      </div>
+      <p class="muted small">Note: Server-side credentials (R2 keys, bucket) are not configurable from the browser.</p>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+</body>
+
+</html>
