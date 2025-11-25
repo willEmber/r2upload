@@ -1,0 +1,26 @@
+[package]
+name = "r2-upload"
+version = "1.0.0"
+description = "R2 Upload Console - Cloudflare R2 Storage Manager"
+authors = ["R2Upload"]
+edition = "2021"
+
+[lib]
+name = "r2_upload_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.9.0", features = [] }
+tauri-plugin-shell = "2.1.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

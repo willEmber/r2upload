@@ -34,3 +34,15 @@ Thumbs.db
 # Tooling cache
 .turbo/
 
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+*.exe
+!src-tauri/target/release/*.exe
+
+# Build artifacts
+public/r2-bundle.js
+
+# Installer files
+rustup-init.exe
+

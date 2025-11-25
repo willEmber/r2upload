@@ -1,10 +1,15 @@
 // Simple config persisted in localStorage
 const defaults = {
-  apiBase: '', // same origin
+  apiBase: 'http://localhost:3000', // default to local server for desktop app
   publicBaseOverride: '',
   defaultPrefix: '',
   defaultStrategy: 'hash',
   theme: 'system', // light | dark | system
+  // R2 Credentials (for desktop app)
+  r2Endpoint: '',
+  r2AccessKey: '',
+  r2SecretKey: '',
+  r2Bucket: '',
 };
 
 const $ = (id) => document.getElementById(id);
@@ -17,9 +22,7 @@ function saveCfg(cfg) { localStorage.setItem('r2cfg', JSON.stringify(cfg)); }
 let CFG = loadCfg();
 applyTheme(CFG.theme);
 
-// Health status monitoring
-let healthCheckInterval;
-
+// Health status monitoring (manual only)
 function updateHealthStatus(status, text, icon) {
   const healthElement = $('healthStatus');
   const iconElement = healthElement.querySelector('.health-icon');
@@ -31,75 +34,90 @@ function updateHealthStatus(status, text, icon) {
   // Add new status class
   healthElement.classList.add(status);
 
-  // Update content
-  iconElement.textContent = icon;
+  // Update content - use SVG icons
+  const icons = {
+    checking: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>',
+    healthy: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+    unhealthy: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>'
+  };
+  iconElement.innerHTML = icons[status] || icons.checking;
   textElement.textContent = text;
 }
 
 async function checkHealth() {
-  updateHealthStatus('checking', 'Checking...', '⚡');
+  updateHealthStatus('checking', '检查中...', '');
 
   try {
     const response = await fetch(apiUrl('/api/health'), {
       method: 'GET',
-      headers: { 'Accept': 'application/json' }
+      headers: { 'Accept': 'application/json', ...getR2Headers() }
     });
 
     if (response.ok) {
       const data = await response.json();
       if (data.ok) {
-        updateHealthStatus('healthy', 'Healthy', '✅');
+        updateHealthStatus('healthy', '正常', '');
       } else {
-        updateHealthStatus('unhealthy', 'Unhealthy', '❌');
+        updateHealthStatus('unhealthy', '异常', '');
       }
     } else {
-      updateHealthStatus('unhealthy', `Error ${response.status}`, '❌');
+      updateHealthStatus('unhealthy', `错误 ${response.status}`, '');
     }
   } catch (error) {
-    updateHealthStatus('unhealthy', 'Offline', '❌');
+    updateHealthStatus('unhealthy', '离线', '');
   }
 }
 
-function startHealthMonitoring() {
-  // Check immediately
-  checkHealth();
-
-  // Then check every 30 seconds
-  if (healthCheckInterval) clearInterval(healthCheckInterval);
-  healthCheckInterval = setInterval(checkHealth, 30000);
-}
-
-function stopHealthMonitoring() {
-  if (healthCheckInterval) {
-    clearInterval(healthCheckInterval);
-    healthCheckInterval = null;
-  }
-}
-
-// Add click handler for health status
+// Add click handler for manual health check
 document.addEventListener('DOMContentLoaded', () => {
   $('healthStatus').addEventListener('click', () => {
     checkHealth();
   });
+  // Check on page load
+  checkHealth();
 });
-
-// Start monitoring when page loads
-startHealthMonitoring();
 
 function applyTheme(theme) {
   const root = document.documentElement;
-  if (theme === 'light' || theme === 'dark') root.setAttribute('data-theme', theme);
-  else root.removeAttribute('data-theme');
+  root.classList.remove('dark-mode');
+  if (theme === 'light') {
+    root.setAttribute('data-theme', 'light');
+  } else if (theme === 'dark') {
+    root.setAttribute('data-theme', 'dark');
+    root.classList.add('dark-mode');
+  } else {
+    root.removeAttribute('data-theme');
+    // Check system preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      root.classList.add('dark-mode');
+    }
+  }
 }
 
-function toast(msg, ms = 1800) {
+function toast(msg, ms = 2000) {
   const t = $('toast');
-  t.textContent = msg;
+  const msgEl = t.querySelector('.toast-message');
+  if (msgEl) {
+    msgEl.textContent = msg;
+  } else {
+    t.textContent = msg;
+  }
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), ms);
 }
 
 function apiUrl(p) { return (CFG.apiBase || '') + p; }
+
+// Get R2 headers for API requests (desktop app)
+function getR2Headers() {
+  const headers = {};
+  if (CFG.r2Endpoint) headers['X-R2-Endpoint'] = CFG.r2Endpoint;
+  if (CFG.r2AccessKey) headers['X-R2-Access-Key'] = CFG.r2AccessKey;
+  if (CFG.r2SecretKey) headers['X-R2-Secret-Key'] = CFG.r2SecretKey;
+  if (CFG.r2Bucket) headers['X-R2-Bucket'] = CFG.r2Bucket;
+  if (CFG.publicBaseOverride) headers['X-R2-Public-Url'] = CFG.publicBaseOverride;
+  return headers;
+}
 
 // Settings dialog
 $('btnSettings').addEventListener('click', () => {
@@ -108,6 +126,10 @@ $('btnSettings').addEventListener('click', () => {
   $('cfgDefaultPrefix').value = CFG.defaultPrefix;
   $('cfgDefaultStrategy').value = CFG.defaultStrategy;
   $('cfgTheme').value = CFG.theme;
+  $('cfgEndpoint').value = CFG.r2Endpoint || '';
+  $('cfgAccessKey').value = CFG.r2AccessKey || '';
+  $('cfgSecretKey').value = CFG.r2SecretKey || '';
+  $('cfgBucket').value = CFG.r2Bucket || '';
   $('settingsDialog').showModal();
 });
 
@@ -119,6 +141,10 @@ $('btnSaveSettings').addEventListener('click', (e) => {
     defaultPrefix: $('cfgDefaultPrefix').value.trim().replace(/\/$/, ''),
     defaultStrategy: $('cfgDefaultStrategy').value,
     theme: $('cfgTheme').value,
+    r2Endpoint: $('cfgEndpoint').value.trim(),
+    r2AccessKey: $('cfgAccessKey').value.trim(),
+    r2SecretKey: $('cfgSecretKey').value.trim(),
+    r2Bucket: $('cfgBucket').value.trim(),
   };
   saveCfg(CFG);
   applyTheme(CFG.theme);
@@ -126,7 +152,7 @@ $('btnSaveSettings').addEventListener('click', (e) => {
   // apply defaults to form
   if (!$('prefix').value) $('prefix').value = CFG.defaultPrefix;
   $('strategy').value = CFG.defaultStrategy;
-  toast('Settings saved');
+  toast('设置已保存');
 });
 
 // Initialize form defaults
@@ -176,22 +202,22 @@ function fmtBytes(n) {
 
 function renderQueue() {
   const grid = $('previewGrid');
-  if (!queue.length) { grid.innerHTML = '<div class="muted small">No files selected</div>'; return; }
+  if (!queue.length) { grid.innerHTML = '<div class="muted small" style="padding: 16px; text-align: center;">暂无选择的文件</div>'; return; }
   grid.innerHTML = queue.map((it) => {
     const isImg = it.file.type?.startsWith('image/');
     const name = escapeHtml(it.file.name);
     const size = fmtBytes(it.file.size);
-    const badge = it.status === 'done' ? '<span class="badge ok">done</span>' : it.status === 'error' ? `<span class="badge err" title="${escapeHtml(it.error)}">error</span>` : `<span class="badge">${escapeHtml(it.status)}</span>`;
-    const link = it.publicUrl ? `<a href="${it.publicUrl}" target="_blank" rel="noreferrer">open</a>` : '';
+    const badge = it.status === 'done' ? '<span class="badge ok">完成</span>' : it.status === 'error' ? `<span class="badge err" title="${escapeHtml(it.error)}">错误</span>` : `<span class="badge">${escapeHtml(it.status === 'queued' ? '等待' : it.status === 'uploading' ? '上传中' : it.status)}</span>`;
+    const link = it.publicUrl ? `<a href="${it.publicUrl}" target="_blank" rel="noreferrer">打开</a>` : '';
     return `
       <div class="preview-item" data-id="${it.id}">
         <div class="thumb">
-          ${isImg && it.url ? `<img src="${it.url}" alt="${name}" />` : `<div class="muted">${name.split('.').pop()?.toUpperCase() || 'FILE'}</div>`}
+          ${isImg && it.url ? `<img src="${it.url}" alt="${name}" />` : `<div class="file-type">${name.split('.').pop()?.toUpperCase() || 'FILE'}</div>`}
           <button class="remove" data-remove="${it.id}">×</button>
         </div>
         <div class="meta">
           <div class="name" title="${name}">${name}</div>
-          <div class="muted">${size} ${badge} ${link ? ' • ' + link : ''}</div>
+          <div class="info">${size} ${badge} ${link ? ' • ' + link : ''}</div>
           <progress value="${it.progress}" max="100"></progress>
         </div>
       </div>
@@ -204,7 +230,7 @@ function removeFromQueue(id) {
   const idx = queue.findIndex((x) => x.id === id);
   if (idx >= 0) {
     const it = queue[idx];
-    if (it.status === 'uploading') { alert('Cannot remove while uploading'); return; }
+    if (it.status === 'uploading') { toast('上传中的文件无法移除'); return; }
     if (it.url) URL.revokeObjectURL(it.url);
     queue.splice(idx, 1);
     renderQueue();
@@ -213,14 +239,25 @@ function removeFromQueue(id) {
 }
 
 function updateOverallProgress() {
-  if (!queue.length) { $('overallProgress').value = 0; return; }
+  if (!queue.length) {
+    $('overallProgress').value = 0;
+    const progressText = document.querySelector('.progress-text');
+    if (progressText) progressText.textContent = '0%';
+    return;
+  }
   const sum = queue.reduce((acc, it) => acc + (it.status === 'done' ? 100 : it.progress || 0), 0);
-  $('overallProgress').value = Math.floor(sum / queue.length);
+  const percent = Math.floor(sum / queue.length);
+  $('overallProgress').value = percent;
+  const progressText = document.querySelector('.progress-text');
+  if (progressText) progressText.textContent = `${percent}%`;
 }
 
 $('btnUploadAll').addEventListener('click', async () => {
+  // Check health before upload
+  await checkHealth();
+
   const items = queue.filter((it) => it.status === 'queued' || it.status === 'error');
-  if (!items.length) { alert('No files to upload'); return; }
+  if (!items.length) { toast('没有待上传的文件'); return; }
   let prefix = $('prefix').value.trim() || CFG.defaultPrefix;
   const strategy = $('strategy').value || CFG.defaultStrategy;
   if (prefix) prefix = prefix.replace(/\/$/, '');
@@ -231,7 +268,11 @@ $('btnUploadAll').addEventListener('click', async () => {
       it.status = 'uploading'; it.progress = 0; renderQueue(); updateOverallProgress();
       try {
         const body = { filename: it.file.name, contentType: it.file.type || 'application/octet-stream', prefix, strategy };
-        const signRes = await fetch(apiUrl('/api/sign-upload'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+        const signRes = await fetch(apiUrl('/api/sign-upload'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getR2Headers() },
+          body: JSON.stringify(body)
+        }).then(r => r.json());
         if (!signRes.url) throw new Error(signRes.error || 'No signed URL');
         await uploadWithProgress(signRes.url, it.file, it.file.type || 'application/octet-stream', (p) => { it.progress = p; updateItemProgress(it.id, p); });
         it.key = signRes.key;
@@ -241,7 +282,7 @@ $('btnUploadAll').addEventListener('click', async () => {
         it.status = 'error'; it.error = e?.message || String(e); renderQueue(); updateOverallProgress();
       }
     }
-    toast('All uploads complete');
+    toast('所有文件上传完成');
   } finally {
     disableUploadUI(false);
   }
@@ -275,7 +316,10 @@ let page = 1;
 let tokenStack = ['']; // track tokens for Prev
 let nextToken = null;
 
-$('btnList').addEventListener('click', () => refreshList(true));
+$('btnList').addEventListener('click', async () => {
+  await checkHealth();
+  refreshList(true);
+});
 $('btnNext').addEventListener('click', () => { if (nextToken) { tokenStack.push(nextToken); page++; refreshList(false); } });
 $('btnPrev').addEventListener('click', () => { if (tokenStack.length > 1) { tokenStack.pop(); page = Math.max(1, page - 1); refreshList(false); } });
 
@@ -287,7 +331,7 @@ async function refreshList(reset) {
   const t = tokenStack[tokenStack.length - 1];
   if (t) params.set('continuationToken', t);
   const url = apiUrl('/api/objects' + (params.toString() ? `?${params}` : ''));
-  const res = await fetch(url).then(r => r.json());
+  const res = await fetch(url, { headers: getR2Headers() }).then(r => r.json());
 
   // Build table
   const rows = (res.contents || []).map((o) => {
@@ -297,11 +341,11 @@ async function refreshList(reset) {
       <tr>
         <td><input type="checkbox" data-key="${escapeHtml(k)}" /></td>
         <td><code>${escapeHtml(k)}</code></td>
-        <td>${o.size ?? ''}</td>
-        <td>${o.lastModified ? new Date(o.lastModified).toLocaleString() : ''}</td>
+        <td>${o.size != null ? fmtBytes(o.size) : ''}</td>
+        <td>${o.lastModified ? new Date(o.lastModified).toLocaleString('zh-CN') : ''}</td>
         <td>
-          ${pub ? `<a href="${pub}" target="_blank" rel="noreferrer">🔗 open</a> <button class="btn" data-copy="${pub}">📋 Copy</button>` : '<span class="muted">🚫 No public URL</span>'}
-          <button class="btn danger" data-del="${escapeHtml(k)}">🗑️ Delete</button>
+          ${pub ? `<a href="${pub}" target="_blank" rel="noreferrer">🔗 打开</a> <button class="btn" data-copy="${pub}">📋 复制</button>` : '<span class="muted">🚫 无公开链接</span>'}
+          <button class="btn btn-danger" data-del="${escapeHtml(k)}">🗑️ 删除</button>
         </td>
       </tr>
     `;
@@ -312,10 +356,10 @@ async function refreshList(reset) {
       <thead>
         <tr>
           <th><input type="checkbox" id="chkAll"/></th>
-          <th>Key</th>
-          <th>Size</th>
-          <th>Modified</th>
-          <th>Actions</th>
+          <th>文件路径</th>
+          <th>大小</th>
+          <th>修改时间</th>
+          <th>操作</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -329,7 +373,7 @@ async function refreshList(reset) {
   nextToken = res.nextContinuationToken;
   $('btnNext').disabled = !nextToken;
   $('btnPrev').disabled = tokenStack.length <= 1;
-  $('pageInfo').textContent = `Page ${page}${res.keyCount ? ` • ${res.keyCount} items` : ''}`;
+  $('pageInfo').textContent = `第 ${page} 页${res.keyCount ? ` • ${res.keyCount} 项` : ''}`;
 }
 
 function composePublicUrl(key) {
@@ -343,7 +387,7 @@ function bindCopyButtons(scope) {
       const val = btn.getAttribute('data-copy');
       if (!val) return;
       await navigator.clipboard.writeText(val);
-      toast('Copied');
+      toast('已复制到剪贴板');
     });
   });
 }
@@ -353,9 +397,9 @@ function bindDeleteButtons(scope) {
     btn.addEventListener('click', async () => {
       const key = btn.getAttribute('data-del');
       if (!key) return;
-      if (!confirm(`Delete:\n${key}?`)) return;
+      if (!confirm(`确认删除:\n${key}?`)) return;
       await delKey(key);
-      toast('Deleted');
+      toast('已删除');
       refreshList(false);
     });
   });
@@ -363,7 +407,7 @@ function bindDeleteButtons(scope) {
 
 async function delKey(key) {
   const url = apiUrl('/api/objects/' + encodeURIComponent(key));
-  const res = await fetch(url, { method: 'DELETE' });
+  const res = await fetch(url, { method: 'DELETE', headers: getR2Headers() });
   if (!res.ok) throw new Error('Delete failed');
 }
 
@@ -385,12 +429,16 @@ function bindSelectionControls() {
   btnDeleteSelected.onclick = async () => {
     const keys = [...document.querySelectorAll('tbody input[type="checkbox"][data-key]')].filter(b => b.checked).map(b => b.getAttribute('data-key')).filter(Boolean);
     if (!keys.length) return;
-    if (!confirm(`Delete ${keys.length} objects?`)) return;
+    if (!confirm(`确认删除 ${keys.length} 个文件?`)) return;
     // Use batch API
     const url = apiUrl('/api/objects/batch');
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', keys }) });
-    if (!res.ok) { alert('Batch delete failed'); return; }
-    toast('Batch deleted');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getR2Headers() },
+      body: JSON.stringify({ action: 'delete', keys })
+    });
+    if (!res.ok) { toast('批量删除失败'); return; }
+    toast('批量删除成功');
     refreshList(false);
   };
   updateState();

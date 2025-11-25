@@ -175,22 +175,19 @@
           </svg>
           <input id="listPrefix" type="text" placeholder="按前缀过滤 (可选)" />
         </div>
-        <button id="btnList" class="btn btn-primary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-          </svg>
-          刷新列表
-        </button>
-      </div>
-
-      <div class="batch-actions">
         <button id="btnDeleteSelected" class="btn btn-danger" disabled>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
           删除选中项
+        </button>
+        <button id="btnList" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          刷新列表
         </button>
       </div>
 
@@ -293,20 +290,6 @@
         </div>
 
         <div class="settings-section">
-          <h4>API 配置</h4>
-          <div class="form-row">
-            <label for="cfgApiBase">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-              </svg>
-              API 基础 URL
-            </label>
-            <input id="cfgApiBase" type="text" placeholder="默认: http://localhost:3000 (留空)" />
-          </div>
-        </div>
-
-        <div class="settings-section">
           <h4>上传默认值</h4>
           <div class="form-row">
             <label for="cfgDefaultPrefix">
@@ -391,7 +374,9 @@
     </div>
   </footer>
 
-  <script src="/app.js"></script>
+  <!-- R2 Client Bundle (standalone, no backend needed) -->
+  <script src="/r2-bundle.js"></script>
+  <script src="/app-standalone.js"></script>
 </body>
 
 </html>

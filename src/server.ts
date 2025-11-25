@@ -3,11 +3,31 @@ import cors from 'cors';
 import morgan from 'morgan';
 import { z } from 'zod';
 import { loadConfig } from './config';
-import { createUploadUrl, deleteObject, headObject, listObjects, publicUrlFor, renameObject, copyObject } from './r2';
+import { createUploadUrl, deleteObject, headObject, listObjects, publicUrlFor, renameObject, copyObject, createR2Client } from './r2';
 import { generateObjectKey } from './utils/keygen';
+import type { S3Client } from '@aws-sdk/client-s3';
 
 const cfg = loadConfig();
 const app = express();
+
+// Middleware to parse R2 config from headers (for desktop app)
+function getR2Config(req: express.Request): { client?: S3Client; bucket?: string; publicUrl?: string } {
+  const endpoint = req.headers['x-r2-endpoint'] as string;
+  const accessKey = req.headers['x-r2-access-key'] as string;
+  const secretKey = req.headers['x-r2-secret-key'] as string;
+  const bucket = req.headers['x-r2-bucket'] as string;
+  const publicUrl = req.headers['x-r2-public-url'] as string;
+
+  if (endpoint && accessKey && secretKey) {
+    return {
+      client: createR2Client({ endpoint, accessKeyId: accessKey, secretAccessKey: secretKey }),
+      bucket: bucket || cfg.bucket,
+      publicUrl: publicUrl || cfg.publicBaseUrl,
+    };
+  }
+
+  return {};
+}
 
 // CORS setup
 if (cfg.allowOrigins === '*') {
@@ -43,6 +63,7 @@ app.post('/api/sign-upload', async (req, res, next) => {
   try {
     const body = SignUploadBody.parse(req.body);
     const strategy = body.strategy || cfg.keyStrategy;
+    const { client, bucket, publicUrl } = getR2Config(req);
 
     const sanitize = (name: string) => name.replace(/[\\/\u0000-\u001f]/g, '_').replace(/\s+/g, '-');
     let key: string;
@@ -57,8 +78,8 @@ app.post('/api/sign-upload', async (req, res, next) => {
         : baseKey;
     }
 
-    const url = await createUploadUrl(key, body.contentType, body.cacheControl);
-    res.json({ key, url, publicUrl: publicUrlFor(key) });
+    const url = await createUploadUrl(key, body.contentType, body.cacheControl, client, bucket);
+    res.json({ key, url, publicUrl: publicUrlFor(key, publicUrl) });
   } catch (err) {
     next(err);
   }
@@ -70,8 +91,9 @@ app.get('/api/objects', async (req, res, next) => {
     const prefix = typeof req.query.prefix === 'string' ? req.query.prefix : '';
     const maxKeys = req.query.maxKeys ? Math.min(1000, Math.max(1, parseInt(String(req.query.maxKeys), 10))) : 100;
     const continuationToken = typeof req.query.continuationToken === 'string' ? req.query.continuationToken : undefined;
+    const { client, bucket } = getR2Config(req);
 
-    const out = await listObjects({ prefix, maxKeys, continuationToken });
+    const out = await listObjects({ prefix, maxKeys, continuationToken }, client, bucket);
     res.json({
       isTruncated: out.IsTruncated ?? false,
       nextContinuationToken: out.NextContinuationToken ?? null,
@@ -94,7 +116,8 @@ app.get('/api/objects', async (req, res, next) => {
 app.delete('/api/objects/*', async (req, res, next) => {
   try {
     const key = decodeURIComponent((req.params as any)[0]);
-    await deleteObject(key);
+    const { client, bucket } = getR2Config(req);
+    await deleteObject(key, client, bucket);
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -106,7 +129,8 @@ const RenameBody = z.object({ oldKey: z.string().min(1), newKey: z.string().min(
 app.post('/api/objects/rename', async (req, res, next) => {
   try {
     const { oldKey, newKey } = RenameBody.parse(req.body);
-    await renameObject(oldKey, newKey);
+    const { client, bucket } = getR2Config(req);
+    await renameObject(oldKey, newKey, client, bucket);
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -123,8 +147,10 @@ const BatchBody = z.object({
 app.post('/api/objects/batch', async (req, res, next) => {
   try {
     const { action, keys, targetPrefix } = BatchBody.parse(req.body);
+    const { client, bucket } = getR2Config(req);
+
     if (action === 'delete') {
-      for (const k of keys) await deleteObject(k);
+      for (const k of keys) await deleteObject(k, client, bucket);
       return res.json({ ok: true, count: keys.length });
     }
 
@@ -136,9 +162,9 @@ app.post('/api/objects/batch', async (req, res, next) => {
       const rest = parts.join('/');
       const to = `${targetPrefix.replace(/\/$/, '')}/${file}`;
       if (action === 'copy') {
-        await copyObject(k, to); // copy only
+        await copyObject(k, to, client, bucket); // copy only
       } else {
-        await renameObject(k, to); // move
+        await renameObject(k, to, client, bucket); // move
       }
       moved.push({ from: k, to });
     }
@@ -152,7 +178,8 @@ app.post('/api/objects/batch', async (req, res, next) => {
 app.get('/api/objects/*/head', async (req, res, next) => {
   try {
     const key = decodeURIComponent((req.params as any)[0]);
-    const h = await headObject(key);
+    const { client, bucket } = getR2Config(req);
+    const h = await headObject(key, client, bucket);
     res.json({
       key,
       contentLength: h.ContentLength ?? null,
