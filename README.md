@@ -39,7 +39,7 @@ Cloudflare R2 文件上传管理工具，提供 **网页端** 和 **桌面 GUI �
 | 配置项 | 说明 | 示例 |
 |--------|------|------|
 | R2 Endpoint | Cloudflare R2 S3 API 端点 | `https://xxxx.r2.cloudflarestorage.com` |
-| Access Key ID | R2 API 访问密钥 ID | `3bc38007e210ab2ecc040ff59874b47c` |
+| Access Key ID | R2 API 访问密钥 ID | `3bc38007e210...` |
 | Secret Access Key | R2 API 访问密钥 | `e6f361dd9945...` |
 | 存储桶名称 | R2 Bucket 名称 | `my-bucket` |
 | 公开访问基础 URL | 可选，用于生成公开链接 | `https://res.example.com` |

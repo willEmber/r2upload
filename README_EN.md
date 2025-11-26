@@ -39,7 +39,7 @@ Download the latest version from [Releases](https://github.com/willEmber/r2uploa
 | Field | Description | Example |
 |-------|-------------|---------|
 | R2 Endpoint | Cloudflare R2 S3 API endpoint | `https://xxxx.r2.cloudflarestorage.com` |
-| Access Key ID | R2 API access key ID | `3bc38007e210ab2ecc040ff59874b47c` |
+| Access Key ID | R2 API access key ID | `3bc38007e210a...` |
 | Secret Access Key | R2 API secret key | `e6f361dd9945...` |
 | Bucket Name | R2 Bucket name | `my-bucket` |
 | Public Base URL | Optional, for generating public links | `https://res.example.com` |
